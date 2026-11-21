@@ -1,0 +1,33 @@
+name: PR 546 native Windows lock verification
+
+on:
+  push:
+    branches: [verify/pr-546-windows]
+    paths: [.github/workflows/verify-pr-546-windows.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  native-lock-tests:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cc6b0ff0cbec003aecafdfd28417f77be31aade2
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install project test dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Verify both lock directions and the managed export
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD) -ne 'cc6b0ff0cbec003aecafdfd28417f77be31aade2') {
+            throw 'The checkout differs from the reviewed PR head'
+          }
+          python -c "import os, sys; assert os.name == 'nt'; print(sys.version)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest -o "addopts=" -v --tb=short tests/test_artifact_helper_copies.py tests/test_session_lock_across_processes.py tests/test_result_delivery.py::test_progress_uses_committed_control_and_a_fixed_clock
